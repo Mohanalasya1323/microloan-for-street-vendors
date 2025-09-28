@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Register</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-indigo-200 via-purple-300 to-pink-200 min-h-screen flex justify-center items-center">
+  <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm">
+    <h2 class="text-2xl font-bold text-blue-600 mb-6 text-center">Register as Vendor</h2>
+
+    <form id="registerForm" class="space-y-4">
+      <input type="text" id="name" placeholder="Full Name" required
+             class="w-full px-4 py-2 border rounded focus:outline-none focus:ring focus:border-blue-400" />
+
+      <input type="email" id="email" placeholder="Email" required
+             class="w-full px-4 py-2 border rounded focus:outline-none focus:ring focus:border-blue-400" />
+
+      <input type="password" id="password" placeholder="Password" required
+             class="w-full px-4 py-2 border rounded focus:outline-none focus:ring focus:border-blue-400" />
+
+      <button type="submit"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded">
+        Register
+      </button>
+    </form>
+
+    <p class="text-sm text-gray-600 mt-4 text-center">
+      Already have an account?
+      <a href="user-login.html" class="text-blue-600 hover:underline">Login</a>
+    </p>
+  </div>
+
+  <!-- Firebase Auth & Realtime DB -->
+  <script type="module">
+    import { auth, db } from "./firebase-config.js";
+    import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+    import { ref, set } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    const form = document.getElementById("registerForm");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const name = document.getElementById("name").value;
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const userId = userCredential.user.uid;
+
+        // Save to Realtime Database
+        await set(ref(db, "users/" + userId), {
+          name: name,
+          email: email
+        });
+
+        alert("✅ Registered Successfully!");
+        window.location.href = "user-login.html";
+      } catch (err) {
+        alert("❌ Error: " + err.message);
+      }
+    });
+  </script>
+</body>
+</html>
+

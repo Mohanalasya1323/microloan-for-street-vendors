@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MicroLoan Portal - Vendor Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+</head>
+<body class="bg-gradient-to-br from-indigo-200 via-purple-300 to-pink-200 min-h-screen p-6 flex flex-col items-center">
+
+  <div class="w-full max-w-5xl space-y-8">
+    <!-- Header -->
+    <div class="flex justify-between items-center bg-gradient-to-r from-purple-300 via-indigo-200 to-pink-300 p-4 rounded-lg shadow">
+      <h1 class="text-2xl font-bold text-gray-800">💼 Vendor MicroLoan Dashboard</h1>
+      <button onclick="logout()" class="text-sm bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Logout</button>
+    </div>
+
+    <!-- Connect Wallet -->
+    <div class="text-center">
+      <button onclick="connectWallet()" class="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700">
+        🔗 Connect Wallet
+      </button>
+      <p id="walletAddress" class="mt-2 text-sm text-gray-700"></p>
+    </div>
+
+    <!-- Loan Status -->
+    <div id="loanStatus" class="text-center text-green-700 font-medium text-sm"></div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Upload Button -->
+      <div id="uploadCard" class="bg-purple-100 border border-purple-300 p-6 rounded-lg shadow-md text-center">
+        <h2 class="text-lg font-semibold mb-3 text-purple-800">📎 Document Submission</h2>
+        <button id="uploadBtn" onclick="window.location.href='upload.html'"
+                class="bg-purple-600 text-white px-5 py-2 rounded hover:bg-purple-700 flex items-center justify-center mx-auto">
+          📁 Upload Documents
+        </button>
+        <p id="rejectionNote" class="text-sm text-red-600 mt-2"></p>
+      </div>
+
+      <!-- Request Loan -->
+      <div class="bg-purple-100 border border-purple-300 p-6 rounded-lg shadow-md">
+        <h2 class="text-lg font-semibold mb-3 text-purple-800">💰 Request Loan</h2>
+        <input id="loanAmount" type="number" placeholder="Amount in ETH"
+              class="w-full px-4 py-2 border rounded mb-3" />
+        <button id="requestBtn" onclick="requestLoan()" disabled
+        class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:opacity-50">
+          ✅ Submit Loan Request
+        </button>
+        <p id="loanRequestStatus" class="mt-2 text-sm text-gray-700 text-center"></p>
+      </div>
+    </div>
+
+    <!-- Repay Loan -->
+    <div class="bg-indigo-100 border border-indigo-300 p-6 rounded-lg shadow-md">
+      <h2 class="text-lg font-semibold mb-3 text-indigo-800">💸 Repay Loan</h2>
+      <input id="repayLoanId" type="number" placeholder="Loan ID"
+            class="w-full px-4 py-2 border rounded mb-2" />
+      <input id="repayAmount" type="text" placeholder="Amount in ETH"
+            class="w-full px-4 py-2 border rounded mb-3" readonly />
+      <button onclick="repayLoan()"
+              class="w-full bg-purple-600 text-white py-2 rounded hover:bg-purple-700">
+        💰 Repay Loan
+      </button>
+    </div>
+
+    <!-- Loan History -->
+    <div class="bg-pink-100 border border-pink-300 p-6 rounded-lg shadow-md">
+      <h2 class="text-lg font-semibold mb-3 text-pink-800">📜 Repaid Loan History</h2>
+      <ul id="repaidLoans" class="list-disc pl-6 text-sm text-gray-700 space-y-1"></ul>
+    </div>
+  </div>
+
+  <!-- Logic -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD0sN_fQnP0E7IA87eZ96Gjq-U5Tyrk52Q",
+      authDomain: "microloan-app.firebaseapp.com",
+      databaseURL: "https://microloan-app-default-rtdb.firebaseio.com",
+      projectId: "microloan-app",
+      storageBucket: "microloan-app.appspot.com",
+      messagingSenderId: "344959827055",
+      appId: "1:344959827055:web:68efcbf849a3ae2991219a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    let walletAddress;
+    const contractAddress = "0x969BF18dFdEEF29293301BECb6Cd36fcc744917f";
+    const abi = [
+      { "inputs": [], "stateMutability": "nonpayable", "type": "constructor" },
+      { "inputs": [{ "internalType": "uint256", "name": "_amount", "type": "uint256" }], "name": "requestLoan", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+      { "inputs": [{ "internalType": "uint256", "name": "loanId", "type": "uint256" }], "name": "repayLoan", "outputs": [], "stateMutability": "payable", "type": "function" },
+      { "inputs": [{ "internalType": "uint256", "name": "loanId", "type": "uint256" }], "name": "getLoan", "outputs": [
+        { "internalType": "address", "name": "", "type": "address" },
+        { "internalType": "uint256", "name": "", "type": "uint256" },
+        { "internalType": "bool", "name": "", "type": "bool" },
+        { "internalType": "bool", "name": "", "type": "bool" }
+      ], "stateMutability": "view", "type": "function" },
+      { "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "name": "loans", "outputs": [
+        { "internalType": "address payable", "name": "vendor", "type": "address" },
+        { "internalType": "uint256", "name": "amount", "type": "uint256" },
+        { "internalType": "bool", "name": "approved", "type": "bool" },
+        { "internalType": "bool", "name": "repaid", "type": "bool" }
+      ], "stateMutability": "view", "type": "function" }
+    ];
+
+    window.connectWallet = async function() {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      const signer = provider.getSigner();
+      walletAddress = await signer.getAddress();
+      document.getElementById("walletAddress").innerText = `Connected: ${walletAddress}`;
+      localStorage.setItem("walletAddress", walletAddress);
+
+      document.getElementById("repayLoanId").value = "";
+      document.getElementById("repayAmount").value = "";
+
+      await checkDocumentsAndEnableRequest();
+      await checkLoanStatusAndHistory();
+    };
+
+    window.requestLoan = async function() {
+      const amount = document.getElementById("loanAmount").value;
+      if (!amount) return alert("Please enter loan amount");
+
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const contract = new ethers.Contract(contractAddress, abi, signer);
+
+      try {
+        const tx = await contract.requestLoan(ethers.utils.parseEther(amount));
+        await tx.wait();
+        document.getElementById("loanRequestStatus").innerText = "✅ Loan requested successfully!";
+      } catch (err) {
+        console.error(err);
+        document.getElementById("loanRequestStatus").innerText = "❌ Failed to request loan.";
+      }
+    };
+
+    window.repayLoan = async function() {
+      const loanId = document.getElementById("repayLoanId").value;
+      const repayAmountField = document.getElementById("repayAmount");
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const contract = new ethers.Contract(contractAddress, abi, signer);
+
+      try {
+        const loan = await contract.getLoan(loanId);
+        if (loan.vendor.toLowerCase() !== walletAddress.toLowerCase()) {
+          alert("❌ This loan does not belong to you.");
+          return;
+        }
+        const tx = await contract.repayLoan(loanId, { value: loan[1] });
+        await tx.wait();
+        alert("✅ Loan repaid!");
+        await checkLoanStatusAndHistory();
+      } catch (err) {
+        console.error(err);
+        alert("❌ Repayment failed.");
+      }
+    };
+
+    document.getElementById("repayLoanId").addEventListener("input", async function () {
+      const loanId = this.value.trim();
+      const repayAmountField = document.getElementById("repayAmount");
+      repayAmountField.value = "";
+
+      if (loanId === "") return;
+
+      try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const contract = new ethers.Contract(contractAddress, abi, signer);
+        const loan = await contract.loans(loanId);
+
+        if (loan.vendor.toLowerCase() === walletAddress.toLowerCase() && loan.approved && !loan.repaid) {
+          repayAmountField.value = ethers.utils.formatEther(loan.amount);
+        }
+      } catch {
+        repayAmountField.value = "";
+      }
+    });
+
+    async function checkDocumentsAndEnableRequest() {
+      const requestBtn = document.getElementById("requestBtn");
+      const uploadBtn = document.getElementById("uploadBtn");
+      const rejectionNote = document.getElementById("rejectionNote");
+
+      const docSnap = await get(ref(db, "loanDocuments/" + walletAddress));
+      const approvalsSnap = await get(ref(db, "loanApprovals/" + walletAddress));
+
+      let hasRejected = false;
+      let rejectionReason = "";
+
+      if (approvalsSnap.exists()) {
+        const approvals = approvalsSnap.val();
+        for (const id in approvals) {
+          if (approvals[id].status === "rejected") {
+            hasRejected = true;
+            rejectionReason = approvals[id].reason || "Document not sufficient.";
+            break;
+          }
+        }
+      }
+
+      if (docSnap.exists()) {
+        if (hasRejected) {
+          requestBtn.disabled = false;
+          uploadBtn.disabled = false;
+          uploadBtn.classList.remove("opacity-50", "cursor-not-allowed");
+          rejectionNote.innerText = `⚠️ Documents were rejected: ${rejectionReason}. Please upload updated documents.`;
+        } else {
+          requestBtn.disabled = false;
+          uploadBtn.disabled = true;
+          uploadBtn.classList.add("opacity-50", "cursor-not-allowed");
+          rejectionNote.innerText = "";
+        }
+      } else {
+        requestBtn.disabled = true;
+        uploadBtn.disabled = false;
+        uploadBtn.classList.remove("opacity-50", "cursor-not-allowed");
+        rejectionNote.innerText = "📎 Please upload your documents to continue.";
+      }
+    }
+
+    async function checkLoanStatusAndHistory() {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const contract = new ethers.Contract(contractAddress, abi, signer);
+
+      const historyList = document.getElementById("repaidLoans");
+      const statusMsg = document.getElementById("loanStatus");
+      historyList.innerHTML = "";
+      statusMsg.innerText = "";
+
+      let index = 0;
+      while (true) {
+        try {
+          const loan = await contract.loans(index);
+          if (loan.vendor.toLowerCase() === walletAddress.toLowerCase()) {
+            if (loan.approved && !loan.repaid) {
+              statusMsg.innerText = `✅ Your Loan #${index} is approved.`;
+            }
+            if (loan.repaid) {
+              const li = document.createElement("li");
+              li.innerText = `Loan #${index} - ${ethers.utils.formatEther(loan.amount)} ETH (Repaid)`;
+              historyList.appendChild(li);
+            }
+          }
+          index++;
+        } catch {
+          break;
+        }
+      }
+    }
+
+    window.logout = function() {
+      window.location.href = "user-login.html";
+    };
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+

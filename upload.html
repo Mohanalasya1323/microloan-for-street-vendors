@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Upload Documents - MicroLoan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-indigo-200 via-purple-300 to-pink-200 min-h-screen p-6 flex items-center justify-center">
+
+  <div class="bg-indigo-100 p-8 rounded-lg shadow-md w-full max-w-3xl border border-indigo-300">
+    <h2 class="text-2xl font-bold text-center text-purple-800 mb-6">📄 Submit Business & Document Details</h2>
+
+    <form id="uploadForm" class="space-y-4">
+
+      <!-- Basic Details -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input type="text" id="shopName" placeholder="Shop Name" required class="border px-4 py-2 rounded" />
+        <input type="text" id="businessType" placeholder="Business Type" required class="border px-4 py-2 rounded" />
+        <input type="text" id="address" placeholder="Business Address" required class="border px-4 py-2 rounded" />
+        <input type="number" id="income" placeholder="Monthly Income (INR)" required class="border px-4 py-2 rounded" />
+        <input type="text" id="assets" placeholder="Assets Owned" required class="border px-4 py-2 rounded" />
+        <input type="text" id="upi" placeholder="UPI ID" required class="border px-4 py-2 rounded" />
+        <input type="text" id="aadhaar" placeholder="Aadhaar No." required class="border px-4 py-2 rounded" />
+        <input type="text" id="pan" placeholder="PAN No." required class="border px-4 py-2 rounded" />
+      </div>
+
+      <!-- Document URLs -->
+      <div class="pt-4 space-y-4">
+        <input type="url" id="idProofUrl" placeholder="URL of Identity Proof (PDF, JPG)" required class="w-full border px-4 py-2 rounded" />
+        <input type="url" id="shopPhotoUrl" placeholder="URL of Shop Photo (JPG, PNG)" required class="w-full border px-4 py-2 rounded" />
+        <input type="url" id="assetProofUrl" placeholder="URL of Asset Proof (PDF, JPG, PNG)" required class="w-full border px-4 py-2 rounded" />
+      </div>
+
+      <!-- Submit -->
+      <button type="submit"
+              class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 mt-4">
+        🚀 Submit Details
+      </button>
+    </form>
+  </div>
+
+  <!-- Firebase Script -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD0sN_fQnP0E7IA87eZ96Gjq-U5Tyrk52Q",
+      authDomain: "microloan-app.firebaseapp.com",
+      databaseURL: "https://microloan-app-default-rtdb.firebaseio.com",
+      projectId: "microloan-app",
+      storageBucket: "microloan-app.appspot.com",
+      messagingSenderId: "344959827055",
+      appId: "1:344959827055:web:68efcbf849a3ae2991219a",
+      measurementId: "G-X5X1Q3FKDK"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const form = document.getElementById("uploadForm");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const walletAddress = localStorage.getItem("walletAddress");
+      if (!walletAddress) {
+        alert("❌ Wallet not connected. Please connect your wallet first.");
+        return;
+      }
+
+      const data = {
+        shopName: form.shopName.value.trim(),
+        businessType: form.businessType.value.trim(),
+        address: form.address.value.trim(),
+        income: form.income.value.trim(),
+        assets: form.assets.value.trim(),
+        upi: form.upi.value.trim(),
+        aadhaar: form.aadhaar.value.trim(),
+        pan: form.pan.value.trim(),
+        idProofUrl: form.idProofUrl.value.trim(),
+        shopPhotoUrl: form.shopPhotoUrl.value.trim(),
+        assetProofUrl: form.assetProofUrl.value.trim(),
+        timestamp: new Date().toISOString()
+      };
+
+      try {
+        const recordRef = ref(db, "loanDocuments/" + walletAddress);
+        await set(recordRef, data);
+        alert("✅ Details submitted successfully!");
+        window.location.href = "user-dashboard.html";
+      } catch (err) {
+        console.error("❌ Submission Error:", err);
+        alert("Failed to submit details.");
+      }
+    });
+  </script>
+</body>
+</html>
+
+
+
+

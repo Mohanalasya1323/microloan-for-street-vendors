@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Dashboard - MicroLoan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+</head>
+<body class="bg-gradient-to-br from-indigo-200 via-purple-300 to-pink-200 min-h-screen p-6 flex flex-col items-center">
+  <div class="w-full max-w-4xl space-y-6">
+    <div class="text-center bg-gradient-to-r from-purple-200 via-indigo-200 to-pink-200 p-5 rounded-xl shadow">
+      <h1 class="text-3xl font-bold text-yellow-700">🛠️ Admin Dashboard</h1>
+    </div>
+
+    <div class="flex justify-end w-full">
+      <select id="filterStatus" class="px-4 py-2 rounded border border-gray-300 bg-white shadow">
+        <option value="pending">Pending</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="deleted">Deleted</option> <!-- ✅ Added -->
+      </select>
+    </div>
+
+    <div class="text-center mb-4">
+      <button onclick="connectWallet()" class="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700">
+        🔗 Connect Wallet
+      </button>
+      <p id="walletStatus" class="text-sm text-gray-700 mt-2"></p>
+    </div>
+
+    <div id="loanList" class="space-y-4 w-full">
+      <p class="text-gray-600 text-sm text-center">Loading loan requests from blockchain...</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD0sN_fQnP0E7IA87eZ96Gjq-U5Tyrk52Q",
+      authDomain: "microloan-app.firebaseapp.com",
+      databaseURL: "https://microloan-app-default-rtdb.firebaseio.com",
+      projectId: "microloan-app",
+      storageBucket: "microloan-app.appspot.com",
+      messagingSenderId: "344959827055",
+      appId: "1:344959827055:web:68efcbf849a3ae2991219a"
+    };
+
+    initializeApp(firebaseConfig);
+    const db = getDatabase();
+
+    let signer, contract;
+    const contractAddress = "0x969BF18dFdEEF29293301BECb6Cd36fcc744917f";
+    const abi = [
+      { "inputs": [], "stateMutability": "nonpayable", "type": "constructor" },
+      {
+        "inputs": [{ "internalType": "uint256", "name": "loanId", "type": "uint256" }],
+        "name": "approveLoan", "outputs": [], "stateMutability": "payable", "type": "function"
+      },
+      {
+        "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "name": "loans", "outputs": [
+          { "internalType": "address payable", "name": "vendor", "type": "address" },
+          { "internalType": "uint256", "name": "amount", "type": "uint256" },
+          { "internalType": "bool", "name": "approved", "type": "bool" },
+          { "internalType": "bool", "name": "repaid", "type": "bool" }
+        ],
+        "stateMutability": "view", "type": "function"
+      }
+    ];
+
+    async function connectWallet() {
+      if (!window.ethereum) return alert("MetaMask not found");
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      signer = provider.getSigner();
+      contract = new ethers.Contract(contractAddress, abi, signer);
+      const address = await signer.getAddress();
+      document.getElementById("walletStatus").innerText = `✅ Connected: ${address}`;
+      await loadLoans();
+    }
+    window.connectWallet = connectWallet;
+
+    async function loadLoans() {
+      const container = document.getElementById("loanList");
+      container.innerHTML = "";
+      const filter = document.getElementById("filterStatus").value;
+      let index = 0, found = false;
+
+      while (true) {
+        try {
+          const loan = await contract.loans(index);
+          const vendor = loan.vendor;
+          if (vendor === ethers.constants.AddressZero) break;
+
+          const snapApproval = await get(ref(db, `loanApprovals/${vendor}/${index}`));
+          const status = snapApproval.exists() ? snapApproval.val().status : "pending";
+          const reason = snapApproval.exists() ? snapApproval.val().reason : "";
+          const showDeleted = (filter === "deleted");
+
+          if (status === "deleted" && !showDeleted) {
+            index++;
+            continue;
+          }
+
+          if (status === filter) {
+            found = true;
+            const snapDocs = await get(ref(db, `loanDocuments/${vendor}`));
+            const docs = snapDocs.exists() ? snapDocs.val() : {};
+
+            const card = document.createElement("div");
+            card.className = `w-full p-4 border rounded-xl shadow space-y-2 ${
+              status === "deleted" ? "bg-gray-200 opacity-60" : "bg-white"
+            }`;
+
+            card.innerHTML = `
+              <p><strong>Loan ID:</strong> ${index}</p>
+              <p><strong>Vendor:</strong> ${vendor}</p>
+              <p><strong>Shop Name:</strong> ${docs.shopName || "-"}</p>
+              <p><strong>Business Type:</strong> ${docs.businessType || "-"}</p>
+              <p><strong>Address:</strong> ${docs.address || "-"}</p>
+              <p><strong>Monthly Income:</strong> ${docs.income || "-"}</p>
+              <p><strong>Loan Amount:</strong> ${ethers.utils.formatEther(loan.amount)} ETH</p>
+              <p><strong>Status:</strong> ${status}</p>
+              ${status === "rejected" && reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ""}
+              <p><strong>ID Proof:</strong> ${docs.idProofUrl ? `<a href="${docs.idProofUrl}" target="_blank">View</a>` : "Not uploaded"}</p>
+              <p><strong>Shop Photo:</strong> ${docs.shopPhotoUrl ? `<a href="${docs.shopPhotoUrl}" target="_blank">View</a>` : "Not uploaded"}</p>
+              <p><strong>Asset Proof:</strong> ${docs.assetProofUrl ? `<a href="${docs.assetProofUrl}" target="_blank">View</a>` : "Not uploaded"}</p>
+              ${
+                status !== "deleted" ? `
+                <div class="flex flex-col space-y-2 mt-2">
+                  <button onclick="approveLoan(${index}, '${vendor}')" class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">✅ Approve</button>
+                  <textarea id="reason-${index}" placeholder="Enter reason for rejection..." class="border px-2 py-1 rounded w-full text-sm">${reason || ""}</textarea>
+                  <button onclick="rejectLoan(${index}, '${vendor}')" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">❌ Reject</button>
+                  <button onclick="deleteLoan('${vendor}', ${index})" class="bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700">🗑️ Delete</button>
+                </div>` : ""
+              }
+            `;
+            container.appendChild(card);
+          }
+          index++;
+        } catch {
+          break;
+        }
+      }
+
+      if (!found) container.innerHTML = "<p class='text-center text-gray-600'>No records found</p>";
+    }
+
+    async function approveLoan(id, vendor) {
+      if (!confirm(`Approve Loan #${id}?`)) return;
+
+      try {
+        const loan = await contract.loans(id);
+        const tx = await contract.approveLoan(id, {
+          value: loan.amount.toString()
+        });
+        await tx.wait();
+
+        await set(ref(db, `loanApprovals/${vendor}/${id}`), {
+          status: "approved",
+          timestamp: new Date().toISOString()
+        });
+
+        alert(`✅ Loan #${id} approved`);
+        loadLoans();
+      } catch (err) {
+        console.error("Error approving loan:", err);
+        alert("❌ Approval failed: " + (err?.data?.message || err?.message || "Unknown error"));
+      }
+    }
+    window.approveLoan = approveLoan;
+
+    async function rejectLoan(id, vendor) {
+      const reason = document.getElementById(`reason-${id}`).value.trim();
+      if (!reason) return alert("Enter a reason to reject");
+
+      await set(ref(db, `loanApprovals/${vendor}/${id}`), {
+        status: "rejected",
+        reason,
+        timestamp: new Date().toISOString()
+      });
+
+      alert("❌ Rejected successfully");
+      loadLoans();
+    }
+    window.rejectLoan = rejectLoan;
+
+    async function deleteLoan(vendor, id) {
+      if (!confirm(`Delete loan #${id} for ${vendor}? This cannot be undone.`)) return;
+
+      try {
+        await set(ref(db, `loanApprovals/${vendor}/${id}`), {
+          status: "deleted",
+          timestamp: new Date().toISOString()
+        });
+
+        alert(`🗑️ Loan #${id} marked as deleted`);
+        loadLoans();
+      } catch (e) {
+        console.error("Delete error:", e);
+        alert("❌ Could not delete loan.");
+      }
+    }
+    window.deleteLoan = deleteLoan;
+
+    document.getElementById("filterStatus").addEventListener("change", loadLoans);
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

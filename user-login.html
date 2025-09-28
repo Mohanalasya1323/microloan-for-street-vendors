@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>User Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-indigo-200 via-purple-300 to-pink-200 min-h-screen flex justify-center items-center">
+  <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm">
+    <h2 class="text-2xl font-bold text-green-600 mb-6 text-center">Vendor Login</h2>
+
+    <form id="loginForm" class="space-y-4">
+      <input type="email" id="email" placeholder="Email" required
+             class="w-full px-4 py-2 border rounded focus:outline-none focus:ring focus:border-green-400" />
+
+      <input type="password" id="password" placeholder="Password" required
+             class="w-full px-4 py-2 border rounded focus:outline-none focus:ring focus:border-green-400" />
+
+      <button type="submit"
+              class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded">
+        Login
+      </button>
+    </form>
+
+    <p class="text-sm text-gray-600 mt-4 text-center">
+      New user? <a href="register.html" class="text-green-600 hover:underline">Register here</a>
+    </p>
+  </div>
+
+  <!-- Firebase Login Script -->
+  <script type="module">
+    import { auth } from "./firebase-config.js";
+    import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+
+    const form = document.getElementById("loginForm");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        alert("✅ Login successful!");
+        window.location.href = "user-dashboard.html";
+      } catch (err) {
+        alert("❌ Login failed: " + err.message);
+      }
+    });
+  </script>
+</body>
+</html>
+
